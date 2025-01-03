@@ -53,9 +53,11 @@ func main() {
 			panic(err)
 		}
 
-		if isTimePassed {
-			_, err = DeleteUser(db, user.ID)
+		if !isTimePassed {
+			continue
 		}
+
+		_, err = DeleteUser(db, user.ID)
 
 		if err != nil {
 			fmt.Println("Не удалось удалить запись в таблице users с ID = " + ID_Str)
