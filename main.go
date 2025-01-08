@@ -1,20 +1,51 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 type User struct {
-	ID        int64
-	DateUntil string
+	ID         int64
+	Vpn_key_id int64
+	Name       string
+	Access_key string
+	DateUntil  string
+}
+
+type AccessKey struct {
+	Id        string
+	Name      string
+	Password  string
+	Port      int32
+	Method    string
+	AccessUrl string
+}
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
 }
 
 func main() {
+	urlApi, _ := os.LookupEnv("URL")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
 	db, err := sql.Open("mysql", "root:rootroot@/outline_db")
 
 	if err != nil {
@@ -39,6 +70,7 @@ func main() {
 		var user User
 		var ID_Str string
 		var isTimePassed bool = false
+		var req *http.Request
 
 		err := rows.Scan(&user.ID, &user.DateUntil)
 
@@ -57,14 +89,36 @@ func main() {
 			continue
 		}
 
+		req, err = http.NewRequest("DELETE", urlApi + "/access-keys/" + ID_Str, nil)
+
+		fmt.Println(ID_Str + " будет удален")
+
+		if err != nil {
+			fmt.Println("Не удалось удалить запись в таблице users с ID = " + ID_Str)
+			panic(err)
+		}
+
+		resp, err := client.Do(req)
+
+		if err != nil {
+			fmt.Println("Не удалось удалить запись в таблице users с ID = " + ID_Str)
+			panic(err)
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 204 {
+			fmt.Println("Не удалось удалить ключ Outline у " + user.Name)
+		}
+
 		_, err = DeleteUser(db, user.ID)
 
 		if err != nil {
 			fmt.Println("Не удалось удалить запись в таблице users с ID = " + ID_Str)
 			panic(err)
-		} else {
-			fmt.Println("User с ID = " + ID_Str + " был удален")
 		}
+
+		fmt.Println("User с ID = " + ID_Str + " был удален")
 	}
 
 	err = rows.Err()
